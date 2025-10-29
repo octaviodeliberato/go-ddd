@@ -12,12 +12,70 @@ import (
 	"github.com/sklinkert/go-ddd/internal/domain/repositories"
 )
 
+// ProductService implements the ProductService interface defined in internal/application/interfaces.
+//
+// METHOD IMPLEMENTATION EXPLANATION:
+//
+// The ProductService methods (CreateProduct, UpdateProduct, DeleteProduct, FindAllProducts, FindProductById)
+// are implemented DIRECTLY in this struct. They are NOT inherited or delegated from elsewhere.
+//
+// Here's how the architecture works:
+//
+// 1. SERVICE INTERFACE (internal/application/interfaces/product_service.go):
+//   - Defines the contract that any ProductService implementation must fulfill
+//   - Lists method signatures: CreateProduct, UpdateProduct, DeleteProduct, FindAllProducts, FindProductById
+//
+// 2. SERVICE IMPLEMENTATION (this file):
+//   - This ProductService struct implements all methods defined in the interface
+//   - Each method contains the business logic and orchestration code
+//   - Methods are written directly in this file (see CreateProduct, UpdateProduct, DeleteProduct, FindAllProducts, FindProductById methods below)
+//
+// 3. REPOSITORY PATTERN:
+//   - ProductService depends on repository INTERFACES (not concrete implementations)
+//   - Repository interfaces are defined in internal/domain/repositories/
+//   - Concrete implementations are in internal/infrastructure/db/postgres/
+//   - Repositories are injected via the constructor (NewProductService)
+//
+// 4. DEPENDENCY INJECTION:
+//   - The constructor NewProductService receives repository implementations
+//   - These repositories are stored as struct fields
+//   - Service methods use these repositories to perform data operations
+//   - Example: s.productRepository.Create(...), s.sellerRepository.FindById(...)
+//
+// 5. LAYERED ARCHITECTURE (DDD/Onion Architecture):
+//   - Domain Layer: Defines entities and repository interfaces
+//   - Application Layer: This service orchestrates business operations
+//   - Infrastructure Layer: Provides concrete repository implementations (e.g., PostgreSQL)
+//   - The application layer knows about domain but not about infrastructure details
+//
+// In summary: The service methods are implemented HERE in this file. They use injected
+// repositories to interact with data storage, following the Dependency Inversion Principle.
 type ProductService struct {
 	productRepository repositories.ProductRepository
 	sellerRepository  repositories.SellerRepository
 	idempotencyRepo   repositories.IdempotencyRepository
 }
 
+// NewProductService is the constructor that creates a new ProductService instance.
+//
+// DEPENDENCY INJECTION EXPLANATION:
+// This constructor follows the Dependency Injection pattern. It receives repository
+// implementations as parameters and stores them in the ProductService struct.
+//
+// Parameters:
+//   - productRepository: Implements repositories.ProductRepository interface
+//   - sellerRepository: Implements repositories.SellerRepository interface
+//   - idempotencyRepo: Implements repositories.IdempotencyRepository interface
+//
+// The actual implementations (e.g., SqlcProductRepository from infrastructure layer)
+// are passed in by the caller (typically in cmd/marketplace/main.go during application startup).
+//
+// This pattern allows:
+//   - Easy testing with mock repositories
+//   - Decoupling from specific database implementations
+//   - Flexibility to change persistence mechanisms without changing service code
+//
+// Returns an interfaces.ProductService implementation (*ProductService)
 func NewProductService(
 	productRepository repositories.ProductRepository,
 	sellerRepository repositories.SellerRepository,
@@ -30,6 +88,24 @@ func NewProductService(
 	}
 }
 
+// CreateProduct implements the ProductService interface method for creating a new product.
+//
+// METHOD IMPLEMENTATION:
+// This method is implemented directly here in the ProductService struct. The implementation:
+//
+// 1. Handles idempotency to prevent duplicate operations
+// 2. Validates that the seller exists using sellerRepository
+// 3. Creates and validates a new Product entity (domain layer responsibility)
+// 4. Persists the product using productRepository.Create()
+// 5. Returns the result wrapped in a command result object
+//
+// REPOSITORY USAGE:
+// - s.idempotencyRepo.FindByKey() / Create() - for idempotency checking
+// - s.sellerRepository.FindById() - to validate seller exists
+// - s.productRepository.Create() - to persist the new product
+//
+// The repositories handle all data access, while this service method orchestrates
+// the business flow and enforces business rules.
 func (s *ProductService) CreateProduct(productCommand *command.CreateProductCommand) (*command.CreateProductCommandResult, error) {
 	ctx := context.Background()
 
@@ -105,6 +181,19 @@ func (s *ProductService) CreateProduct(productCommand *command.CreateProductComm
 	return &result, nil
 }
 
+// FindAllProducts implements the ProductService interface method for retrieving all products.
+//
+// METHOD IMPLEMENTATION:
+// This is a QUERY method (read operation) that:
+//
+// 1. Calls s.productRepository.FindAll() to retrieve all products from storage
+// 2. Maps domain entities to query result objects using the mapper
+// 3. Returns the query result
+//
+// REPOSITORY USAGE:
+// - s.productRepository.FindAll() - retrieves all products from the database
+//
+// Note: This method has NO side effects and doesn't modify any state (CQRS Query pattern).
 func (s *ProductService) FindAllProducts() (*query.GetAllProductsQueryResult, error) {
 	storedProducts, err := s.productRepository.FindAll()
 	if err != nil {

@@ -28,7 +28,7 @@ import (
 // 2. SERVICE IMPLEMENTATION (this file):
 //   - This ProductService struct implements all methods defined in the interface
 //   - Each method contains the business logic and orchestration code
-//   - Methods are written directly in this file (see lines 33-284)
+//   - Methods are written directly in this file (see methods below)
 //
 // 3. REPOSITORY PATTERN:
 //   - ProductService depends on repository INTERFACES (not concrete implementations)
@@ -75,7 +75,7 @@ type ProductService struct {
 //   - Decoupling from specific database implementations
 //   - Flexibility to change persistence mechanisms without changing service code
 //
-// Returns: A ProductService that implements the interfaces.ProductService interface
+// Returns interfaces.ProductService which is implemented by *ProductService
 func NewProductService(
 	productRepository repositories.ProductRepository,
 	sellerRepository repositories.SellerRepository,
